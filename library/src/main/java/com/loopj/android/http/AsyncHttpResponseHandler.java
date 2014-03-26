@@ -320,14 +320,14 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
      */
     protected void postRunnable(Runnable runnable) {
         boolean missingLooper = null == Looper.myLooper();
-        if (missingLooper) {
-            Looper.prepare();
-        }
-        if (null != runnable) {
-            handler.post(runnable);
-        }
-        if (missingLooper) {
-            Looper.loop();
+        if (runnable != null) {
+            if (missingLooper) {
+                // If there is no looper, run on provided handler
+                handler.post(runnable);
+            } else {
+                // Otherwise, run on current thread
+                runnable.run();
+            }
         }
     }
 
@@ -376,7 +376,7 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
                 if (contentLength > Integer.MAX_VALUE) {
                     throw new IllegalArgumentException("HTTP entity too large to be buffered in memory");
                 }
-                int buffersize = (contentLength < 0) ? BUFFER_SIZE : (int) contentLength;
+                int buffersize = (contentLength <= 0) ? BUFFER_SIZE : (int) contentLength;
                 try {
                     ByteArrayBuffer buffer = new ByteArrayBuffer(buffersize);
                     try {
@@ -386,10 +386,10 @@ public abstract class AsyncHttpResponseHandler implements ResponseHandlerInterfa
                         while ((l = instream.read(tmp)) != -1 && !Thread.currentThread().isInterrupted()) {
                             count += l;
                             buffer.append(tmp, 0, l);
-                            sendProgressMessage(count, (int) contentLength);
+                            sendProgressMessage(count, (int) (contentLength <= 0 ? 1 : contentLength));
                         }
                     } finally {
-                        instream.close();
+                        AsyncHttpClient.silentCloseInputStream(instream);
                     }
                     responseBody = buffer.toByteArray();
                 } catch (OutOfMemoryError e) {
