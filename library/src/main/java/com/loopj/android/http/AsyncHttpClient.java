@@ -19,6 +19,7 @@
 package com.loopj.android.http;
 
 import android.content.Context;
+import android.os.Looper;
 import android.util.Log;
 
 import org.apache.http.Header;
@@ -38,6 +39,7 @@ import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CookieStore;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.RedirectHandler;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpGet;
@@ -45,6 +47,7 @@ import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.params.ClientPNames;
 import org.apache.http.client.protocol.ClientContext;
 import org.apache.http.conn.params.ConnManagerParams;
 import org.apache.http.conn.params.ConnPerRouteBean;
@@ -56,7 +59,6 @@ import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.HttpEntityWrapper;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.client.DefaultRedirectHandler;
 import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpConnectionParams;
@@ -100,7 +102,6 @@ import java.util.zip.GZIPInputStream;
  */
 public class AsyncHttpClient {
 
-    public static final String VERSION = "1.4.5";
     public static final int DEFAULT_MAX_CONNECTIONS = 10;
     public static final int DEFAULT_SOCKET_TIMEOUT = 10 * 1000;
     public static final int DEFAULT_MAX_RETRIES = 5;
@@ -213,13 +214,12 @@ public class AsyncHttpClient {
         HttpConnectionParams.setSocketBufferSize(httpParams, DEFAULT_SOCKET_BUFFER_SIZE);
 
         HttpProtocolParams.setVersion(httpParams, HttpVersion.HTTP_1_1);
-        HttpProtocolParams.setUserAgent(httpParams, String.format("android-async-http/%s (http://loopj.com/android-async-http)", VERSION));
 
         ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(httpParams, schemeRegistry);
 
-        threadPool = Executors.newCachedThreadPool();
-        requestMap = new WeakHashMap<>();
-        clientHeaderMap = new HashMap<>();
+        threadPool = getDefaultThreadPool();
+        requestMap = new WeakHashMap<Context, List<RequestHandle>>();
+        clientHeaderMap = new HashMap<String, String>();
 
         httpContext = new SyncBasicHttpContext(new BasicHttpContext());
         httpClient = new DefaultHttpClient(cm, httpParams);
@@ -263,6 +263,7 @@ public class AsyncHttpClient {
         });
 
         httpClient.addRequestInterceptor(new HttpRequestInterceptor() {
+            @Override
             public void process(final HttpRequest request, final HttpContext context) throws HttpException, IOException {
                 AuthState authState = (AuthState) context.getAttribute(ClientContext.TARGET_AUTH_STATE);
                 CredentialsProvider credsProvider = (CredentialsProvider) context.getAttribute(
@@ -338,18 +339,68 @@ public class AsyncHttpClient {
     }
 
     /**
+     * Returns the current executor service used. By default, Executors.newFixedThreadPool() is
+     * used.
+     *
+     * @return current executor service used
+     */
+    public ExecutorService getThreadPool() {
+        return threadPool;
+    }
+
+    /**
+     * Get the default threading pool to be used for this HTTP client.
+     *
+     * @return The default threading pool to be used
+     */
+    protected ExecutorService getDefaultThreadPool() {
+        return Executors.newCachedThreadPool();
+    }
+
+    /**
      * Simple interface method, to enable or disable redirects. If you set manually RedirectHandler
      * on underlying HttpClient, effects of this method will be canceled.
+     * <p/>
+     * Default setting is to disallow redirects.
      *
+     * @param enableRedirects         boolean
+     * @param enableRelativeRedirects boolean
+     * @param enableCircularRedirects boolean
+     */
+    public void setEnableRedirects(final boolean enableRedirects, final boolean enableRelativeRedirects, final boolean enableCircularRedirects) {
+        httpClient.getParams().setBooleanParameter(ClientPNames.REJECT_RELATIVE_REDIRECT, !enableRelativeRedirects);
+        httpClient.getParams().setBooleanParameter(ClientPNames.ALLOW_CIRCULAR_REDIRECTS, enableCircularRedirects);
+        httpClient.setRedirectHandler(new MyRedirectHandler(enableRedirects));
+    }
+
+    /**
+     * Circular redirects are enabled by default
+     *
+     * @param enableRedirects         boolean
+     * @param enableRelativeRedirects boolean
+     * @see #setEnableRedirects(boolean, boolean, boolean)
+     */
+    public void setEnableRedirects(final boolean enableRedirects, final boolean enableRelativeRedirects) {
+        setEnableRedirects(enableRedirects, enableRelativeRedirects, true);
+    }
+
+    /**
      * @param enableRedirects boolean
+     * @see #setEnableRedirects(boolean, boolean, boolean)
      */
     public void setEnableRedirects(final boolean enableRedirects) {
-        httpClient.setRedirectHandler(new DefaultRedirectHandler() {
-            @Override
-            public boolean isRedirectRequested(HttpResponse response, HttpContext context) {
-                return enableRedirects;
-            }
-        });
+        setEnableRedirects(enableRedirects, enableRedirects, enableRedirects);
+    }
+
+    /**
+     * Allows you to set custom RedirectHandler implementation, if the default provided doesn't suit
+     * your needs
+     *
+     * @param customRedirectHandler RedirectHandler instance
+     * @see com.loopj.android.http.MyRedirectHandler
+     */
+    public void setRedirectHandler(final RedirectHandler customRedirectHandler) {
+        httpClient.setRedirectHandler(customRedirectHandler);
     }
 
     /**
@@ -558,13 +609,27 @@ public class AsyncHttpClient {
      * @param mayInterruptIfRunning specifies if active requests should be cancelled along with
      *                              pending requests.
      */
-    public void cancelRequests(Context context, boolean mayInterruptIfRunning) {
-        List<RequestHandle> requestList = requestMap.get(context);
-        if (requestList != null) {
-            for (RequestHandle requestHandle : requestList) {
-                requestHandle.cancel(mayInterruptIfRunning);
+    public void cancelRequests(final Context context, final boolean mayInterruptIfRunning) {
+        if (context == null) {
+            Log.e(LOG_TAG, "Passed null Context to cancelRequests");
+            return;
+        }
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                List<RequestHandle> requestList = requestMap.get(context);
+                if (requestList != null) {
+                    for (RequestHandle requestHandle : requestList) {
+                        requestHandle.cancel(mayInterruptIfRunning);
+                    }
+                    requestMap.remove(context);
+                }
             }
-            requestMap.remove(context);
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            new Thread(r).start();
+        } else {
+            r.run();
         }
     }
 
@@ -1005,7 +1070,7 @@ public class AsyncHttpClient {
             // Add request to request map
             List<RequestHandle> requestList = requestMap.get(context);
             if (requestList == null) {
-                requestList = new LinkedList<>();
+                requestList = new LinkedList();
                 requestMap.put(context, requestList);
             }
 

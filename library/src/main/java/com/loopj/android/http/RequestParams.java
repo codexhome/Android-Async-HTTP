@@ -64,7 +64,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * params.put("like", set); // url params: "like=music&amp;like=art"
  *
  * List&lt;String&gt; list = new ArrayList&lt;String&gt;(); // Ordered collection
- * list.add("Java");
+ * list.add("Java");<>
  * list.add("C");
  * params.put("languages", list); // url params: "languages[]=Java&amp;languages[]=C"
  *
@@ -96,10 +96,10 @@ public class RequestParams {
     protected boolean isRepeatable;
     protected boolean useJsonStreamer;
     protected boolean autoCloseInputStreams;
-    protected final ConcurrentHashMap<String, String> urlParams = new ConcurrentHashMap<>();
-    protected final ConcurrentHashMap<String, StreamWrapper> streamParams = new ConcurrentHashMap<>();
-    protected final ConcurrentHashMap<String, FileWrapper> fileParams = new ConcurrentHashMap<>();
-    protected final ConcurrentHashMap<String, Object> urlParamsWithObjects = new ConcurrentHashMap<>();
+    protected final ConcurrentHashMap<String, String> urlParams = new ConcurrentHashMap();
+    protected final ConcurrentHashMap<String, StreamWrapper> streamParams = new ConcurrentHashMap();
+    protected final ConcurrentHashMap<String, FileWrapper> fileParams = new ConcurrentHashMap();
+    protected final ConcurrentHashMap<String, Object> urlParamsWithObjects = new ConcurrentHashMap();
     protected String contentEncoding = HTTP.UTF_8;
 
     /**
@@ -483,7 +483,7 @@ public class RequestParams {
     }
 
     protected List<BasicNameValuePair> getParamsList() {
-        List<BasicNameValuePair> lparams = new LinkedList<>();
+        List<BasicNameValuePair> lparams = new LinkedList();
 
         for (ConcurrentHashMap.Entry<String, String> entry : urlParams.entrySet()) {
             lparams.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
@@ -495,7 +495,7 @@ public class RequestParams {
     }
 
     private List<BasicNameValuePair> getParamsList(String key, Object value) {
-        List<BasicNameValuePair> params = new LinkedList<>();
+        List<BasicNameValuePair> params = new LinkedList();
         if (value instanceof Map) {
             Map map = (Map) value;
             List list = new ArrayList<Object>(map.keySet());
@@ -512,21 +512,23 @@ public class RequestParams {
             }
         } else if (value instanceof List) {
             List list = (List) value;
-            for (Object nestedValue : list) {
-                params.addAll(getParamsList(String.format("%s[]", key), nestedValue));
+            int listSize = list.size();
+            for (int nestedValueIndex = 0; nestedValueIndex < listSize; nestedValueIndex++) {
+                params.addAll(getParamsList(String.format("%s[%d]", key, nestedValueIndex), list.get(nestedValueIndex)));
             }
         } else if (value instanceof Object[]) {
             Object[] array = (Object[]) value;
-            for (Object nestedValue : array) {
-                params.addAll(getParamsList(String.format("%s[]", key), nestedValue));
+            int arrayLength = array.length;
+            for (int nestedValueIndex = 0; nestedValueIndex < arrayLength; nestedValueIndex++) {
+                params.addAll(getParamsList(String.format("%s[%d]", key, nestedValueIndex), array[nestedValueIndex]));
             }
         } else if (value instanceof Set) {
             Set set = (Set) value;
             for (Object nestedValue : set) {
                 params.addAll(getParamsList(key, nestedValue));
             }
-        } else if (value instanceof String) {
-            params.add(new BasicNameValuePair(key, (String) value));
+        } else {
+            params.add(new BasicNameValuePair(key, value.toString()));
         }
         return params;
     }
