@@ -64,7 +64,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * params.put("like", set); // url params: "like=music&amp;like=art"
  *
  * List&lt;String&gt; list = new ArrayList&lt;String&gt;(); // Ordered collection
- * list.add("Java");<>
+ * list.add("Java");
  * list.add("C");
  * params.put("languages", list); // url params: "languages[]=Java&amp;languages[]=C"
  *
@@ -324,6 +324,19 @@ public class RequestParams {
         streamParams.remove(key);
         fileParams.remove(key);
         urlParamsWithObjects.remove(key);
+    }
+
+    /**
+     * Check if a parameter is defined.
+     *
+     * @param key the key name for the parameter to check existence.
+     * @return Boolean
+     */
+    public boolean has(String key) {
+        return urlParams.get(key) != null ||
+        streamParams.get(key) != null ||
+        fileParams.get(key) != null ||
+        urlParamsWithObjects.get(key) != null;
     }
 
     @Override
