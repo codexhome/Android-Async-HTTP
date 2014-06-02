@@ -73,6 +73,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -217,7 +218,7 @@ public class AsyncHttpClient {
         ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(httpParams, schemeRegistry);
 
         threadPool = getDefaultThreadPool();
-        requestMap = new WeakHashMap<Context, List<RequestHandle>>();
+        requestMap = Collections.synchronizedMap(new WeakHashMap<Context, List<RequestHandle>>());
         clientHeaderMap = new HashMap<String, String>();
 
         httpContext = new SyncBasicHttpContext(new BasicHttpContext());
@@ -358,9 +359,8 @@ public class AsyncHttpClient {
 
     /**
      * Simple interface method, to enable or disable redirects. If you set manually RedirectHandler
-     * on underlying HttpClient, effects of this method will be canceled.
-     * <p>&nbsp;</p>
-     * Default setting is to disallow redirects.
+     * on underlying HttpClient, effects of this method will be canceled. <p>&nbsp;</p> Default
+     * setting is to disallow redirects.
      *
      * @param enableRedirects         boolean
      * @param enableRelativeRedirects boolean
@@ -1085,7 +1085,7 @@ public class AsyncHttpClient {
             // Add request to request map
             List<RequestHandle> requestList = requestMap.get(context);
             if (requestList == null) {
-                requestList = new LinkedList();
+                requestList = new LinkedList<RequestHandle>();
                 requestMap.put(context, requestList);
             }
 
@@ -1124,6 +1124,9 @@ public class AsyncHttpClient {
      * @return encoded url if requested with params appended if any available
      */
     public static String getUrlWithQueryString(boolean shouldEncodeUrl, String url, RequestParams params) {
+        if (url == null)
+            return null;
+
         if (shouldEncodeUrl)
             url = url.replace(" ", "%20");
 
