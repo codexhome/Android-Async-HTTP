@@ -30,6 +30,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+
+import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -165,7 +168,7 @@ public class PersistentCookieStore implements CookieStore {
      * @param cookie cookie to be removed
      */
     public void deleteCookie(Cookie cookie) {
-        String name = cookie.getName();
+        String name = cookie.getName() + cookie.getDomain();
         cookies.remove(name);
         SharedPreferences.Editor prefsWriter = cookiePrefs.edit();
         prefsWriter.remove(COOKIE_NAME_PREFIX + name);
@@ -185,7 +188,8 @@ public class PersistentCookieStore implements CookieStore {
         try {
             ObjectOutputStream outputStream = new ObjectOutputStream(os);
             outputStream.writeObject(cookie);
-        } catch (Exception e) {
+        } catch (IOException e) {
+            Log.d(LOG_TAG, "IOException in encodeCookie", e);
             return null;
         }
 
@@ -205,8 +209,10 @@ public class PersistentCookieStore implements CookieStore {
         try {
             ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
             cookie = ((SerializableCookie) objectInputStream.readObject()).getCookie();
-        } catch (Exception exception) {
-            Log.d(LOG_TAG, "decodeCookie failed", exception);
+        } catch (IOException e) {
+            Log.d(LOG_TAG, "IOException in decodeCookie", e);
+        } catch (ClassNotFoundException e) {
+            Log.d(LOG_TAG, "ClassNotFoundException in decodeCookie", e);
         }
 
         return cookie;
