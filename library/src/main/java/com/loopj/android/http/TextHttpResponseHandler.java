@@ -56,6 +56,7 @@ import java.io.UnsupportedEncodingException;
  * </pre>
  */
 public abstract class TextHttpResponseHandler extends AsyncHttpResponseHandler {
+
     private static final String LOG_TAG = "TextHttpResponseHandler";
 
     /**
@@ -113,11 +114,14 @@ public abstract class TextHttpResponseHandler extends AsyncHttpResponseHandler {
      */
     public static String getResponseString(byte[] stringBytes, String charset) {
         try {
-            return stringBytes == null ? null : new String(stringBytes, charset);
+            String toReturn = (stringBytes == null) ? null : new String(stringBytes, charset);
+            if (toReturn != null && toReturn.startsWith(UTF8_BOM)) {
+                return toReturn.substring(1);
+            }
+            return toReturn;
         } catch (UnsupportedEncodingException e) {
             Log.e(LOG_TAG, "Encoding response into string failed", e);
             return null;
         }
     }
-
 }

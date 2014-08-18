@@ -130,7 +130,8 @@ public class AsyncHttpClient {
     public static final int DEFAULT_SOCKET_BUFFER_SIZE = 8192;
 
     private int maxConnections = DEFAULT_MAX_CONNECTIONS;
-    private int timeout = DEFAULT_SOCKET_TIMEOUT;
+    private int connectTimeout = DEFAULT_SOCKET_TIMEOUT;
+    private int responseTimeout = DEFAULT_SOCKET_TIMEOUT;
 
     private final DefaultHttpClient httpClient;
     private final HttpContext httpContext;
@@ -201,10 +202,11 @@ public class AsyncHttpClient {
         // Fix to SSL flaw in API < ICS
         // See https://code.google.com/p/android/issues/detail?id=13117
         SSLSocketFactory sslSocketFactory;
-        if (fixNoHttpResponseException)
+        if (fixNoHttpResponseException) {
             sslSocketFactory = MySSLSocketFactory.getFixedSocketFactory();
-        else
+        } else {
             sslSocketFactory = SSLSocketFactory.getSocketFactory();
+        }
 
         SchemeRegistry schemeRegistry = new SchemeRegistry();
         schemeRegistry.register(new Scheme("http", PlainSocketFactory.getSocketFactory(), httpPort));
@@ -222,12 +224,12 @@ public class AsyncHttpClient {
 
         BasicHttpParams httpParams = new BasicHttpParams();
 
-        ConnManagerParams.setTimeout(httpParams, timeout);
+        ConnManagerParams.setTimeout(httpParams, connectTimeout);
         ConnManagerParams.setMaxConnectionsPerRoute(httpParams, new ConnPerRouteBean(maxConnections));
         ConnManagerParams.setMaxTotalConnections(httpParams, DEFAULT_MAX_CONNECTIONS);
 
-        HttpConnectionParams.setSoTimeout(httpParams, timeout);
-        HttpConnectionParams.setConnectionTimeout(httpParams, timeout);
+        HttpConnectionParams.setSoTimeout(httpParams, responseTimeout);
+        HttpConnectionParams.setConnectionTimeout(httpParams, connectTimeout);
         HttpConnectionParams.setTcpNoDelay(httpParams, true);
         HttpConnectionParams.setSocketBufferSize(httpParams, DEFAULT_SOCKET_BUFFER_SIZE);
 
@@ -255,6 +257,9 @@ public class AsyncHttpClient {
                                         header, clientHeaderMap.get(header),
                                         overwritten.getName(), overwritten.getValue())
                         );
+
+                        //remove the overwritten header
+                        request.removeHeader(overwritten);
                     }
                     request.addHeader(header, clientHeaderMap.get(header));
                 }
@@ -454,27 +459,73 @@ public class AsyncHttpClient {
     }
 
     /**
-     * Returns current socket timeout limit (milliseconds), default is 10000 (10sec)
+     * Returns current socket timeout limit (milliseconds). By default, this is
+     * set to 10 seconds.
      *
      * @return Socket Timeout limit in milliseconds
+     * @deprecated Use either {@link #getConnectTimeout()} or {@link #getResponseTimeout()}
      */
     public int getTimeout() {
-        return timeout;
+        return connectTimeout;
     }
 
     /**
-     * Set the connection and socket timeout. By default, 10 seconds.
+     * Set both the connection and socket timeouts. By default, both are set to
+     * 10 seconds.
      *
-     * @param timeout the connect/socket timeout in milliseconds, at least 1 second
+     * @param value the connect/socket timeout in milliseconds, at least 1 second
+     * @see {@link #setConnectTimeout(int)} if you need further refinement for either value or
+     * or {@link #setResponseTimeout(int)} methods.
      */
-    public void setTimeout(int timeout) {
-        if (timeout < 1000)
-            timeout = DEFAULT_SOCKET_TIMEOUT;
-        this.timeout = timeout;
-        final HttpParams httpParams = this.httpClient.getParams();
-        ConnManagerParams.setTimeout(httpParams, this.timeout);
-        HttpConnectionParams.setSoTimeout(httpParams, this.timeout);
-        HttpConnectionParams.setConnectionTimeout(httpParams, this.timeout);
+    public void setTimeout(int value) {
+        value = value < 1000 ? DEFAULT_SOCKET_TIMEOUT : value;
+        setConnectTimeout(value);
+        setResponseTimeout(value);
+    }
+
+    /**
+     * Returns current connection timeout limit (milliseconds). By default, this
+     * is set to 10 seconds.
+     *
+     * @return Connection timeout limit in milliseconds
+     */
+    public int getConnectTimeout() {
+        return connectTimeout;
+    }
+
+    /**
+     * Set connection timeout limit (milliseconds). By default, this is set to
+     * 10 seconds.
+     *
+     * @param value Connection timeout in milliseconds, minimal value is 1000 (1 second).
+     */
+    public void setConnectTimeout(int value) {
+        connectTimeout = value < 1000 ? DEFAULT_SOCKET_TIMEOUT : value;
+        final HttpParams httpParams = httpClient.getParams();
+        ConnManagerParams.setTimeout(httpParams, connectTimeout);
+        HttpConnectionParams.setConnectionTimeout(httpParams, connectTimeout);
+    }
+
+    /**
+     * Returns current response timeout limit (milliseconds). By default, this
+     * is set to 10 seconds.
+     *
+     * @return Response timeout limit in milliseconds
+     */
+    public int getResponseTimeout() {
+        return responseTimeout;
+    }
+
+    /**
+     * Set response timeout limit (milliseconds). By default, this is set to
+     * 10 seconds.
+     *
+     * @param value Response timeout in milliseconds, minimal value is 1000 (1 second).
+     */
+    public void setResponseTimeout(int value) {
+        responseTimeout = value < 1000 ? DEFAULT_SOCKET_TIMEOUT : value;
+        final HttpParams httpParams = httpClient.getParams();
+        HttpConnectionParams.setSoTimeout(httpParams, responseTimeout);
     }
 
     /**
@@ -1237,10 +1288,11 @@ public class AsyncHttpClient {
                 entity = params.getEntity(responseHandler);
             }
         } catch (IOException e) {
-            if (responseHandler != null)
+            if (responseHandler != null) {
                 responseHandler.sendFailureMessage(0, null, null, e);
-            else
+            } else {
                 e.printStackTrace();
+            }
         }
 
         return entity;

@@ -36,6 +36,7 @@ import org.json.JSONTokener;
  * Additionally, you can override the other event methods from the parent class.
  */
 public class JsonHttpResponseHandler extends TextHttpResponseHandler {
+
     private static final String LOG_TAG = "JsonHttpResponseHandler";
 
     /**
@@ -143,10 +144,12 @@ public class JsonHttpResponseHandler extends TextHttpResponseHandler {
                     }
                 }
             };
-            if (!getUseSynchronousMode())
+            if (!getUseSynchronousMode()) {
                 new Thread(parser).start();
-            else // In synchronous mode everything should be run on one thread
+            } else {
+                // In synchronous mode everything should be run on one thread
                 parser.run();
+            }
         } else {
             onSuccess(statusCode, headers, new JSONObject());
         }
@@ -186,10 +189,12 @@ public class JsonHttpResponseHandler extends TextHttpResponseHandler {
                     }
                 }
             };
-            if (!getUseSynchronousMode())
+            if (!getUseSynchronousMode()) {
                 new Thread(parser).start();
-            else // In synchronous mode everything should be run on one thread
+            } else {
+                // In synchronous mode everything should be run on one thread
                 parser.run();
+            }
         } else {
             Log.v(LOG_TAG, "response body is null, calling onFailure(Throwable, JSONObject)");
             onFailure(statusCode, headers, throwable, (JSONObject) null);
@@ -212,6 +217,9 @@ public class JsonHttpResponseHandler extends TextHttpResponseHandler {
         String jsonString = getResponseString(responseBody, getCharset());
         if (jsonString != null) {
             jsonString = jsonString.trim();
+            if (jsonString.startsWith(UTF8_BOM)) {
+                jsonString = jsonString.substring(1);
+            }
             if (jsonString.startsWith("{") || jsonString.startsWith("[")) {
                 result = new JSONTokener(jsonString).nextValue();
             }

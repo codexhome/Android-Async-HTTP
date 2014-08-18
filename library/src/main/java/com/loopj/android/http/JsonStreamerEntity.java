@@ -66,13 +66,13 @@ public class JsonStreamerEntity implements HttpEntity {
 
     private static final Header HEADER_JSON_CONTENT =
             new BasicHeader(
-                AsyncHttpClient.HEADER_CONTENT_TYPE,
-                RequestParams.APPLICATION_JSON);
+                    AsyncHttpClient.HEADER_CONTENT_TYPE,
+                    RequestParams.APPLICATION_JSON);
 
     private static final Header HEADER_GZIP_ENCODING =
             new BasicHeader(
-                AsyncHttpClient.HEADER_CONTENT_ENCODING,
-                AsyncHttpClient.ENCODING_GZIP);
+                    AsyncHttpClient.HEADER_CONTENT_ENCODING,
+                    AsyncHttpClient.ENCODING_GZIP);
 
     // JSON data and associated meta-data to be uploaded.
     private final Map<String, Object> jsonParams = new HashMap<String, Object>();
@@ -190,6 +190,12 @@ public class JsonStreamerEntity implements HttpEntity {
 
                 // End the file's object and prepare for next one.
                 os.write('}');
+            } else if (value instanceof JsonValueInterface) {
+                os.write(((JsonValueInterface) value).getEscapedJsonValue());
+            } else if (value instanceof org.json.JSONObject) {
+                os.write(((org.json.JSONObject) value).toString().getBytes());
+            } else if (value instanceof org.json.JSONArray) {
+                os.write(((org.json.JSONArray) value).toString().getBytes());
             } else if (value instanceof Boolean) {
                 os.write((Boolean) value ? JSON_TRUE : JSON_FALSE);
             } else if (value instanceof Long) {
@@ -201,7 +207,7 @@ public class JsonStreamerEntity implements HttpEntity {
             } else if (value instanceof Integer) {
                 os.write((((Number) value).intValue() + "").getBytes());
             } else {
-                os.write(value.toString().getBytes());
+                os.write(escape(value.toString()));
             }
 
             os.write(',');
