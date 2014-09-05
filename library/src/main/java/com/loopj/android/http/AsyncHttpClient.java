@@ -474,8 +474,8 @@ public class AsyncHttpClient {
      * 10 seconds.
      *
      * @param value the connect/socket timeout in milliseconds, at least 1 second
-     * @see {@link #setConnectTimeout(int)} if you need further refinement for either value or
-     * or {@link #setResponseTimeout(int)} methods.
+     * @see #setConnectTimeout(int)
+     * @see #setResponseTimeout(int)
      */
     public void setTimeout(int value) {
         value = value < 1000 ? DEFAULT_SOCKET_TIMEOUT : value;
@@ -1148,7 +1148,11 @@ public class AsyncHttpClient {
         }
 
         if (contentType != null) {
-            uriRequest.setHeader(HEADER_CONTENT_TYPE, contentType);
+            if (uriRequest instanceof HttpEntityEnclosingRequestBase && ((HttpEntityEnclosingRequestBase) uriRequest).getEntity() != null) {
+                Log.w(LOG_TAG, "Passed contentType will be ignored because HttpEntity sets content type");
+            } else {
+                uriRequest.setHeader(HEADER_CONTENT_TYPE, contentType);
+            }
         }
 
         responseHandler.setRequestHeaders(uriRequest.getAllHeaders());
@@ -1374,7 +1378,7 @@ public class AsyncHttpClient {
 
         @Override
         public long getContentLength() {
-            return -1;
+            return wrappedEntity == null ? 0 : wrappedEntity.getContentLength();
         }
 
         @Override
