@@ -73,8 +73,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PushbackInputStream;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -650,8 +652,16 @@ public class AsyncHttpClient {
      */
     public void setBasicAuth(String username, String password, AuthScope scope, boolean preemtive) {
         UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(username, password);
-        this.httpClient.getCredentialsProvider().setCredentials(scope == null ? AuthScope.ANY : scope, credentials);
+        setCredentials(scope, credentials);
         setAuthenticationPreemptive(preemtive);
+    }
+
+    public void setCredentials(AuthScope authScope, Credentials credentials) {
+        if (credentials == null) {
+            Log.d(LOG_TAG, "Provided credentials are null, not setting");
+            return;
+        }
+        this.httpClient.getCredentialsProvider().setCredentials(authScope == null ? AuthScope.ANY : authScope, credentials);
     }
 
     /**
@@ -670,8 +680,18 @@ public class AsyncHttpClient {
 
     /**
      * Removes previously set basic auth credentials
+     *
+     * @deprecated
      */
+    @Deprecated
     public void clearBasicAuth() {
+        clearCredentialsProvider();
+    }
+
+    /**
+     * Removes previously set auth credentials
+     */
+    public void clearCredentialsProvider() {
         this.httpClient.getCredentialsProvider().clear();
     }
 
@@ -1172,9 +1192,6 @@ public class AsyncHttpClient {
                 }
             }
 
-            if (responseHandler instanceof RangeFileAsyncHttpResponseHandler)
-                ((RangeFileAsyncHttpResponseHandler) responseHandler).updateRequestHeaders(uriRequest);
-
             requestList.add(requestHandle);
 
             Iterator<RequestHandle> iterator = requestList.iterator();
@@ -1210,8 +1227,14 @@ public class AsyncHttpClient {
         if (url == null)
             return null;
 
-        if (shouldEncodeUrl)
-            url = url.replace(" ", "%20");
+        if (shouldEncodeUrl) {
+            try {
+                url = URLEncoder.encode(url, "UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                // Should not really happen, added just for sake of validity
+                Log.e(LOG_TAG, "getUrlWithQueryString encoding URL", e);
+            }
+        }
 
         if (params != null) {
             // Construct the query string and trim it, in case it
