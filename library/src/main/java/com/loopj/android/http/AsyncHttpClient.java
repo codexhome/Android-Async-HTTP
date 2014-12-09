@@ -49,6 +49,7 @@ import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.params.ClientPNames;
 import org.apache.http.client.protocol.ClientContext;
+import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.conn.params.ConnManagerParams;
 import org.apache.http.conn.params.ConnPerRouteBean;
 import org.apache.http.conn.params.ConnRoutePNames;
@@ -237,7 +238,8 @@ public class AsyncHttpClient {
 
         HttpProtocolParams.setVersion(httpParams, HttpVersion.HTTP_1_1);
 
-        ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(httpParams, schemeRegistry);
+        ClientConnectionManager cm = createConnectionManager(schemeRegistry, httpParams);
+        Utils.asserts(cm != null, "Custom implementation of #createConnectionManager(SchemeRegistry, BasicHttpParams) returned null");
 
         threadPool = getDefaultThreadPool();
         requestMap = Collections.synchronizedMap(new WeakHashMap<Context, List<RequestHandle>>());
@@ -380,6 +382,17 @@ public class AsyncHttpClient {
      */
     protected ExecutorService getDefaultThreadPool() {
         return Executors.newCachedThreadPool();
+    }
+
+    /**
+     * Provided so it is easier for developers to provide custom ThreadSafeClientConnManager implementation
+     *
+     * @param schemeRegistry SchemeRegistry, usually provided by {@link #getDefaultSchemeRegistry(boolean, int, int)}
+     * @param httpParams     BasicHttpParams
+     * @return ClientConnectionManager instance
+     */
+    protected ClientConnectionManager createConnectionManager(SchemeRegistry schemeRegistry, BasicHttpParams httpParams) {
+        return new ThreadSafeClientConnManager(httpParams, schemeRegistry);
     }
 
     /**
@@ -1062,6 +1075,75 @@ public class AsyncHttpClient {
      */
     public RequestHandle put(Context context, String url, Header[] headers, HttpEntity entity, String contentType, ResponseHandlerInterface responseHandler) {
         HttpEntityEnclosingRequestBase request = addEntityToRequestBase(new HttpPut(URI.create(url).normalize()), entity);
+        if (headers != null) request.setHeaders(headers);
+        return sendRequest(httpClient, httpContext, request, contentType, responseHandler, context);
+    }
+
+    /**
+     * Perform a HTTP PATCH request, without any parameters.
+     *
+     * @param url             the URL to send the request to.
+     * @param responseHandler the response handler instance that should handle the response.
+     * @return RequestHandle of future request process
+     */
+    public RequestHandle patch(String url, ResponseHandlerInterface responseHandler) {
+        return patch(null, url, null, responseHandler);
+    }
+
+    /**
+     * Perform a HTTP PATCH request with parameters.
+     *
+     * @param url             the URL to send the request to.
+     * @param params          additional PUT parameters or files to send with the request.
+     * @param responseHandler the response handler instance that should handle the response.
+     * @return RequestHandle of future request process
+     */
+    public RequestHandle patch(String url, RequestParams params, ResponseHandlerInterface responseHandler) {
+        return patch(null, url, params, responseHandler);
+    }
+
+    /**
+     * Perform a HTTP PATCH request and track the Android Context which initiated the request.
+     *
+     * @param context         the Android Context which initiated the request.
+     * @param url             the URL to send the request to.
+     * @param params          additional PUT parameters or files to send with the request.
+     * @param responseHandler the response handler instance that should handle the response.
+     * @return RequestHandle of future request process
+     */
+    public RequestHandle patch(Context context, String url, RequestParams params, ResponseHandlerInterface responseHandler) {
+        return patch(context, url, paramsToEntity(params, responseHandler), null, responseHandler);
+    }
+
+    /**
+     * Perform a HTTP PATCH request and track the Android Context which initiated the request.
+     *
+     * @param context         the Android Context which initiated the request.
+     * @param url             the URL to send the request to.
+     * @param responseHandler the response handler instance that should handle the response.
+     * @return RequestHandle of future request process
+     */
+    public RequestHandle patch(Context context, String url, HttpEntity entity, String contentType, ResponseHandlerInterface responseHandler) {
+        return sendRequest(httpClient, httpContext, addEntityToRequestBase(new HttpPatch(URI.create(url).normalize()), entity), contentType, responseHandler, context);
+    }
+
+    /**
+     * Perform a HTTP PATCH request and track the Android Context which initiated the request. And set
+     * one-time headers for the request
+     *
+     * @param context         the Android Context which initiated the request.
+     * @param url             the URL to send the request to.
+     * @param headers         set one-time headers for this request
+     * @param entity          a raw {@link HttpEntity} to send with the request, for example, use
+     *                        this to send string/json/xml payloads to a server by passing a {@link
+     *                        org.apache.http.entity.StringEntity}.
+     * @param contentType     the content type of the payload you are sending, for example
+     *                        application/json if sending a json payload.
+     * @param responseHandler the response handler instance that should handle the response.
+     * @return RequestHandle of future request process
+     */
+    public RequestHandle patch(Context context, String url, Header[] headers, HttpEntity entity, String contentType, ResponseHandlerInterface responseHandler) {
+        HttpEntityEnclosingRequestBase request = addEntityToRequestBase(new HttpPatch(URI.create(url).normalize()), entity);
         if (headers != null) request.setHeaders(headers);
         return sendRequest(httpClient, httpContext, request, contentType, responseHandler, context);
     }
