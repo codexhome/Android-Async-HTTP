@@ -1193,6 +1193,18 @@ public class AsyncHttpClient {
     /**
      * Perform a HTTP DELETE request.
      *
+     * @param url             the URL to send the request to.
+     * @param params          additional DELETE parameters or files to send with the request.
+     * @param responseHandler the response handler instance that should handle the response.
+     */
+    public void delete(String url, RequestParams params, AsyncHttpResponseHandler responseHandler) {
+        final HttpDelete delete = new HttpDelete(getUrlWithQueryString(isUrlEncodingEnabled, url, params));
+        sendRequest(httpClient, httpContext, delete, null, responseHandler, null);
+    }
+
+    /**
+     * Perform a HTTP DELETE request.
+     *
      * @param context         the Android Context which initiated the request.
      * @param url             the URL to send the request to.
      * @param headers         set one-time headers for this request
@@ -1245,7 +1257,7 @@ public class AsyncHttpClient {
             throw new IllegalArgumentException("ResponseHandler must not be null");
         }
 
-        if (responseHandler.getUseSynchronousMode()) {
+        if (responseHandler.getUseSynchronousMode() && !responseHandler.getUsePoolThread()) {
             throw new IllegalArgumentException("Synchronous ResponseHandler used in AsyncHttpClient. You should create your response handler in a looper thread or use SyncHttpClient instead.");
         }
 
