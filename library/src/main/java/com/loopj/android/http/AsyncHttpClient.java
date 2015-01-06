@@ -40,9 +40,7 @@ import org.apache.http.client.CookieStore;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.RedirectHandler;
-import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
@@ -901,6 +899,23 @@ public class AsyncHttpClient {
                 context);
     }
 
+    /**
+     * Perform a HTTP GET request and track the Android Context which initiated the request.
+     *
+     * @param context         the Android Context which initiated the request.
+     * @param url             the URL to send the request to.
+     * @param entity          a raw {@link org.apache.http.HttpEntity} to send with the request, for
+     *                        example, use this to send string/json/xml payloads to a server by
+     *                        passing a {@link org.apache.http.entity.StringEntity}.
+     * @param contentType     the content type of the payload you are sending, for example
+     *                        application/json if sending a json payload.
+     * @param responseHandler the response ha   ndler instance that should handle the response.
+     * @return RequestHandle of future request process
+     */
+    public RequestHandle get(Context context, String url, HttpEntity entity, String contentType, ResponseHandlerInterface responseHandler) {
+        return sendRequest(httpClient, httpContext, addEntityToRequestBase(new HttpGet(URI.create(url).normalize()), entity), contentType, responseHandler, context);
+    }
+
     // [-] HTTP GET
     // [+] HTTP POST
 
@@ -954,7 +969,7 @@ public class AsyncHttpClient {
      * @return RequestHandle of future request process
      */
     public RequestHandle post(Context context, String url, HttpEntity entity, String contentType, ResponseHandlerInterface responseHandler) {
-        return sendRequest(httpClient, httpContext, addEntityToRequestBase(new HttpPost(URI.create(url).normalize()), entity), contentType, responseHandler, context);
+        return sendRequest(httpClient, httpContext, addEntityToRequestBase(new HttpPost(getURI(url)), entity), contentType, responseHandler, context);
     }
 
     /**
@@ -972,7 +987,7 @@ public class AsyncHttpClient {
      */
     public RequestHandle post(Context context, String url, Header[] headers, RequestParams params, String contentType,
                               ResponseHandlerInterface responseHandler) {
-        HttpEntityEnclosingRequestBase request = new HttpPost(URI.create(url).normalize());
+        HttpEntityEnclosingRequestBase request = new HttpPost(getURI(url));
         if (params != null) request.setEntity(paramsToEntity(params, responseHandler));
         if (headers != null) request.setHeaders(headers);
         return sendRequest(httpClient, httpContext, request, contentType,
@@ -996,7 +1011,7 @@ public class AsyncHttpClient {
      */
     public RequestHandle post(Context context, String url, Header[] headers, HttpEntity entity, String contentType,
                               ResponseHandlerInterface responseHandler) {
-        HttpEntityEnclosingRequestBase request = addEntityToRequestBase(new HttpPost(URI.create(url).normalize()), entity);
+        HttpEntityEnclosingRequestBase request = addEntityToRequestBase(new HttpPost(getURI(url)), entity);
         if (headers != null) request.setHeaders(headers);
         return sendRequest(httpClient, httpContext, request, contentType, responseHandler, context);
     }
@@ -1055,7 +1070,7 @@ public class AsyncHttpClient {
      * @return RequestHandle of future request process
      */
     public RequestHandle put(Context context, String url, HttpEntity entity, String contentType, ResponseHandlerInterface responseHandler) {
-        return sendRequest(httpClient, httpContext, addEntityToRequestBase(new HttpPut(URI.create(url).normalize()), entity), contentType, responseHandler, context);
+        return sendRequest(httpClient, httpContext, addEntityToRequestBase(new HttpPut(getURI(url)), entity), contentType, responseHandler, context);
     }
 
     /**
@@ -1074,7 +1089,7 @@ public class AsyncHttpClient {
      * @return RequestHandle of future request process
      */
     public RequestHandle put(Context context, String url, Header[] headers, HttpEntity entity, String contentType, ResponseHandlerInterface responseHandler) {
-        HttpEntityEnclosingRequestBase request = addEntityToRequestBase(new HttpPut(URI.create(url).normalize()), entity);
+        HttpEntityEnclosingRequestBase request = addEntityToRequestBase(new HttpPut(getURI(url)), entity);
         if (headers != null) request.setHeaders(headers);
         return sendRequest(httpClient, httpContext, request, contentType, responseHandler, context);
     }
@@ -1124,7 +1139,7 @@ public class AsyncHttpClient {
      * @return RequestHandle of future request process
      */
     public RequestHandle patch(Context context, String url, HttpEntity entity, String contentType, ResponseHandlerInterface responseHandler) {
-        return sendRequest(httpClient, httpContext, addEntityToRequestBase(new HttpPatch(URI.create(url).normalize()), entity), contentType, responseHandler, context);
+        return sendRequest(httpClient, httpContext, addEntityToRequestBase(new HttpPatch(getURI(url)), entity), contentType, responseHandler, context);
     }
 
     /**
@@ -1143,7 +1158,7 @@ public class AsyncHttpClient {
      * @return RequestHandle of future request process
      */
     public RequestHandle patch(Context context, String url, Header[] headers, HttpEntity entity, String contentType, ResponseHandlerInterface responseHandler) {
-        HttpEntityEnclosingRequestBase request = addEntityToRequestBase(new HttpPatch(URI.create(url).normalize()), entity);
+        HttpEntityEnclosingRequestBase request = addEntityToRequestBase(new HttpPatch(getURI(url)), entity);
         if (headers != null) request.setHeaders(headers);
         return sendRequest(httpClient, httpContext, request, contentType, responseHandler, context);
     }
@@ -1171,7 +1186,7 @@ public class AsyncHttpClient {
      * @return RequestHandle of future request process
      */
     public RequestHandle delete(Context context, String url, ResponseHandlerInterface responseHandler) {
-        final HttpDelete delete = new HttpDelete(URI.create(url).normalize());
+        final HttpDelete delete = new HttpDelete(getURI(url));
         return sendRequest(httpClient, httpContext, delete, null, responseHandler, context);
     }
 
@@ -1185,7 +1200,7 @@ public class AsyncHttpClient {
      * @return RequestHandle of future request process
      */
     public RequestHandle delete(Context context, String url, Header[] headers, ResponseHandlerInterface responseHandler) {
-        final HttpDelete delete = new HttpDelete(URI.create(url).normalize());
+        final HttpDelete delete = new HttpDelete(getURI(url));
         if (headers != null) delete.setHeaders(headers);
         return sendRequest(httpClient, httpContext, delete, null, responseHandler, context);
     }
@@ -1216,6 +1231,23 @@ public class AsyncHttpClient {
         HttpDelete httpDelete = new HttpDelete(getUrlWithQueryString(isUrlEncodingEnabled, url, params));
         if (headers != null) httpDelete.setHeaders(headers);
         return sendRequest(httpClient, httpContext, httpDelete, null, responseHandler, context);
+    }
+
+    /**
+     * Perform a HTTP DELETE request and track the Android Context which initiated the request.
+     *
+     * @param context         the Android Context which initiated the request.
+     * @param url             the URL to send the request to.
+     * @param entity          a raw {@link org.apache.http.HttpEntity} to send with the request, for
+     *                        example, use this to send string/json/xml payloads to a server by
+     *                        passing a {@link org.apache.http.entity.StringEntity}.
+     * @param contentType     the content type of the payload you are sending, for example
+     *                        application/json if sending a json payload.
+     * @param responseHandler the response ha   ndler instance that should handle the response.
+     * @return RequestHandle of future request process
+     */
+    public RequestHandle delete(Context context, String url, HttpEntity entity, String contentType, ResponseHandlerInterface responseHandler) {
+        return sendRequest(httpClient, httpContext, addEntityToRequestBase(new HttpDelete(URI.create(url).normalize()), entity), contentType, responseHandler, context);
     }
 
     // [-] HTTP DELETE
@@ -1297,6 +1329,16 @@ public class AsyncHttpClient {
         }
 
         return requestHandle;
+    }
+
+    /**
+     * Returns a {@link URI} instance for the specified, absolute URL string.
+     *
+     * @param url absolute URL string, containing scheme, host and path
+     * @return URI instance for the URL string
+     */
+    protected URI getURI(String url) {
+        return URI.create(url).normalize();
     }
 
     /**
