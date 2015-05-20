@@ -53,7 +53,7 @@ public interface ResponseHandlerInterface {
      * @param bytesWritten number of written bytes
      * @param bytesTotal   number of total bytes to be written
      */
-    void sendProgressMessage(int bytesWritten, int bytesTotal);
+    void sendProgressMessage(long bytesWritten, long bytesTotal);
 
     /**
      * Notifies callback, that request was cancelled
@@ -91,28 +91,28 @@ public interface ResponseHandlerInterface {
      *
      * @return uri of origin request
      */
-    public URI getRequestURI();
+    URI getRequestURI();
 
     /**
      * Returns Header[] which were used to request
      *
      * @return headers from origin request
      */
-    public Header[] getRequestHeaders();
+    Header[] getRequestHeaders();
 
     /**
      * Helper for handlers to receive Request URI info
      *
      * @param requestURI claimed request URI
      */
-    public void setRequestURI(URI requestURI);
+    void setRequestURI(URI requestURI);
 
     /**
      * Helper for handlers to receive Request Header[] info
      *
      * @param requestHeaders Headers, claimed to be from original request
      */
-    public void setRequestHeaders(Header[] requestHeaders);
+    void setRequestHeaders(Header[] requestHeaders);
 
     /**
      * Can set, whether the handler should be asynchronous or synchronous
@@ -148,7 +148,7 @@ public interface ResponseHandlerInterface {
      * This method is called once by the system when the response is about to be
      * processed by the system. The library makes sure that a single response
      * is pre-processed only once.
-     *
+     * <p>&nbsp;</p>
      * Please note: pre-processing does NOT run on the main thread, and thus
      * any UI activities that you must perform should be properly dispatched to
      * the app's UI thread.
@@ -162,7 +162,7 @@ public interface ResponseHandlerInterface {
      * This method is called once by the system when the request has been fully
      * sent, handled and finished. The library makes sure that a single response
      * is post-processed only once.
-     *
+     * <p>&nbsp;</p>
      * Please note: post-processing does NOT run on the main thread, and thus
      * any UI activities that you must perform should be properly dispatched to
      * the app's UI thread.
